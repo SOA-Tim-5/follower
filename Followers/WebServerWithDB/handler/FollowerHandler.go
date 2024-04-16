@@ -80,15 +80,15 @@ func (f *FollowerHandler) MiddlewarePersonDeserialization(next http.Handler) htt
 }
 
 func (f *FollowerHandler) CreateFollowing(rw http.ResponseWriter, h *http.Request) {
-	newFollowing := h.Context().Value(KeyProduct{}).(*model.Following)
+	newFollowing := h.Context().Value(KeyProduct{}).(*model.UserFollowing)
 	user := model.User{}
 	userToFollow := model.User{}
 	user.Id = newFollowing.UserId
 	user.Username = newFollowing.Username
-	user.Image = newFollowing.ProfileImage
+	user.Image = newFollowing.Image
 	userToFollow.Id = newFollowing.FollowingUserId
 	userToFollow.Username = newFollowing.FollowingUsername
-	userToFollow.Image = newFollowing.FollowingProfileImage
+	userToFollow.Image = newFollowing.FollowingImage
 	err := f.repo.SaveFollowing(&user, &userToFollow)
 	if err != nil {
 		f.logger.Print("Database exception: ", err)
@@ -101,7 +101,7 @@ func (f *FollowerHandler) CreateFollowing(rw http.ResponseWriter, h *http.Reques
 }
 func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
-		newFollowing := &model.Following{}
+		newFollowing := &model.UserFollowing{}
 		err := newFollowing.FromJSON(h.Body)
 		if err != nil {
 			http.Error(rw, "Unable to decode json", http.StatusBadRequest)

@@ -5,21 +5,21 @@ import (
 	"io"
 )
 
-type Following struct {
+type UserFollowing struct {
 	UserId                string `json:"userId,omitempty"`
 	Username              string `json:"username,omitempty"`
-	ProfileImage          string `json:"profileImage,omitempty"`
+	Image          string `json:"image,omitempty"`
 	FollowingUserId       string `json:"followingUserId,omitempty"`
 	FollowingUsername     string `json:"followingUsername,omitempty"`
-	FollowingProfileImage string `json:"followingProfileImage,omitempty"`
+	FollowingImage string `json:"followingImage,omitempty"`
 }
 
-func (o *Following) FromJSON(r io.Reader) error {
+func (o *UserFollowing) FromJSON(r io.Reader) error {
 	d := json.NewDecoder(r)
 	return d.Decode(o)
 }
 
-func (o *Following) ToJSON(w io.Writer) error {
+func (o *UserFollowing) ToJSON(w io.Writer) error {
 	e := json.NewEncoder(w)
 	return e.Encode(o)
 }
