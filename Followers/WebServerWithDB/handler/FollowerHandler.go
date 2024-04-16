@@ -4,6 +4,7 @@ import (
 	"context"
 	"database-example/model"
 	repository "database-example/repo"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -36,9 +37,6 @@ func (f *FollowerHandler) CreateUser(rw http.ResponseWriter, h *http.Request) {
 		rw.WriteHeader(http.StatusConflict)
 	}
 }
-
-
-
 
 func (f *FollowerHandler) GetUser(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
@@ -81,5 +79,37 @@ func (f *FollowerHandler) MiddlewarePersonDeserialization(next http.Handler) htt
 	})
 }
 
-
-
+func (f *FollowerHandler) CreateFollowing(rw http.ResponseWriter, h *http.Request) {
+	newFollowing := h.Context().Value(KeyProduct{}).(*model.Following)
+	user := model.User{}
+	userToFollow := model.User{}
+	user.Id = newFollowing.UserId
+	user.Username = newFollowing.Username
+	user.Image = newFollowing.ProfileImage
+	userToFollow.Id = newFollowing.FollowingUserId
+	userToFollow.Username = newFollowing.FollowingUsername
+	userToFollow.Image = newFollowing.FollowingProfileImage
+	err := f.repo.SaveFollowing(&user, &userToFollow)
+	if err != nil {
+		f.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	user = model.User{}
+	jsonData, _ := json.Marshal(user)
+	rw.Write(jsonData)
+}
+func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		newFollowing := &model.Following{}
+		err := newFollowing.FromJSON(h.Body)
+		if err != nil {
+			http.Error(rw, "Unable to decode json", http.StatusBadRequest)
+			f.logger.Fatal(err)
+			return
+		}
+		ctx := context.WithValue(h.Context(), KeyProduct{}, newFollowing)
+		h = h.WithContext(ctx)
+		next.ServeHTTP(rw, h)
+	})
+}

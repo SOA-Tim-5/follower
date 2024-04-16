@@ -4,7 +4,6 @@ import (
 	"context"
 	"database-example/model"
 	"log"
-	"os"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -19,9 +18,9 @@ type FollowerRepository struct {
 // NoSQL: Constructor which reads db configuration from environment and creates a keyspace
 func New(logger *log.Logger) (*FollowerRepository, error) {
 	// Local instance
-	uri := os.Getenv("NEO4J_DB")
-	user := os.Getenv("NEO4J_USERNAME")
-	pass := os.Getenv("NEO4J_PASS")
+	uri := "bolt://neo4j:7687"
+	user := "neo4j"
+	pass := "ivanaanja"
 	auth := neo4j.BasicAuth(user, pass, "")
 
 	driver, err := neo4j.NewDriverWithContext(uri, auth)
@@ -54,7 +53,6 @@ func (mr *FollowerRepository) CloseDriverConnection(ctx context.Context) {
 	mr.driver.Close(ctx)
 }
 
-
 func (mr *FollowerRepository) SaveUser(user *model.User) (bool, error) {
 	userInDatabase, err := mr.ReadUser(user.Id)
 	if (userInDatabase == model.User{}) {
@@ -72,7 +70,7 @@ func (mr *FollowerRepository) SaveUser(user *model.User) (bool, error) {
 
 func (mr *FollowerRepository) WriteUser(user *model.User) error {
 	ctx := context.Background()
-	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"}) 
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer session.Close(ctx)
 	newUser, err := session.ExecuteWrite(ctx,
 		func(transaction neo4j.ManagedTransaction) (any, error) {
@@ -137,13 +135,34 @@ func (mr *FollowerRepository) ReadUser(userId string) (model.User, error) {
 	}
 	userFromDatabase := model.User{
 		Id:       id,
-		Username:     username,
-		Image: image,
+		Username: username,
+		Image:    image,
 	}
 
 	return userFromDatabase, nil
 }
-
-
-
-
+func (mr *FollowerRepository) SaveFollowing(user *model.User, userToFollow *model.User) error {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+	mr.SaveUser(user)
+	mr.SaveUser(userToFollow)
+	_, err := session.ExecuteWrite(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				"MATCH (a:User), (b:User) WHERE a.Username = $username AND b.username = $followUsername CREATE (a)-[r: IS_FOLLOWING]->(b) RETURN type(r)",
+				map[string]any{"username": user.Username, "followUsername": userToFollow.Username})
+			if err != nil {
+				return nil, err
+			}
+			if result.Next(ctx) {
+				return result.Record().Values[0], nil
+			}
+			return nil, result.Err()
+		})
+	if err != nil {
+		mr.logger.Println("Error inserting following:", err)
+		return err
+	}
+	return nil
+}
