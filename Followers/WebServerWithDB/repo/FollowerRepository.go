@@ -18,7 +18,7 @@ type FollowerRepository struct {
 // NoSQL: Constructor which reads db configuration from environment and creates a keyspace
 func New(logger *log.Logger) (*FollowerRepository, error) {
 	// Local instance
-	uri := "bolt://neo4j:7687"
+	uri := "bolt://localhost:7687"
 	user := "neo4j"
 	pass := "ivanaanja"
 	auth := neo4j.BasicAuth(user, pass, "")
@@ -150,7 +150,7 @@ func (mr *FollowerRepository) SaveFollowing(user *model.User, userToFollow *mode
 	_, err := session.ExecuteWrite(ctx,
 		func(transaction neo4j.ManagedTransaction) (any, error) {
 			result, err := transaction.Run(ctx,
-				"MATCH (a:User), (b:User) WHERE a.Username = $username AND b.username = $followUsername CREATE (a)-[r: IS_FOLLOWING]->(b) RETURN type(r)",
+				"MATCH (a:User), (b:User) WHERE a.Username = $username AND b.Username = $followUsername CREATE (a)-[r: IS_FOLLOWING]->(b) RETURN type(r)",
 				map[string]any{"username": user.Username, "followUsername": userToFollow.Username})
 			if err != nil {
 				return nil, err
@@ -165,4 +165,38 @@ func (mr *FollowerRepository) SaveFollowing(user *model.User, userToFollow *mode
 		return err
 	}
 	return nil
+}
+func (mr *FollowerRepository) GetFollowingsForUser(userId string) (model.Users, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+
+	userResults, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				`match (n:User)<-[r:IS_FOLLOWING]-(p:User) where p.Id = $userId return n.Id as id, n.Username as username, n.Image as pImage`,
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			var users model.Users
+			for result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				users = append(users, &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				})
+			}
+			return users, nil
+		})
+	if err != nil {
+		mr.logger.Println("Error querying search:", err)
+		return nil, err
+	}
+	return userResults.(model.Users), nil
 }
