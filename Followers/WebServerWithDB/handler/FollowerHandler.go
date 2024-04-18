@@ -153,3 +153,23 @@ func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) 
 		return
 	}
 }
+func (f *FollowerHandler) GetRecommendations(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["userId"]
+	users, err := f.repo.GetRecommendations(id)
+	if err != nil {
+		f.logger.Print("Database exception: ", err)
+	}
+	if users == nil {
+		users = model.Users{}
+		jsonData, _ := json.Marshal(users)
+		rw.Write(jsonData)
+		return
+	}
+	err = users.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
+		f.logger.Fatal("Unable to convert to json :", err)
+		return
+	}
+}

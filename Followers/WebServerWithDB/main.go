@@ -50,6 +50,9 @@ func main() {
 	getFollowersRouter := router.Methods(http.MethodGet).Subrouter()
 	getFollowersRouter.HandleFunc("/followers/{userId}", FollowerHandler.GetFollowers)
 
+	getRecommendationsRouter := router.Methods(http.MethodGet).Subrouter()
+	getRecommendationsRouter.HandleFunc("/recommendations/{userId}", FollowerHandler.GetRecommendations)
+
 	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
 
 	server := http.Server{

@@ -235,3 +235,39 @@ func (mr *FollowerRepository) GetFollowers(userId string) (model.Users, error) {
 	}
 	return userResults.(model.Users), nil
 }
+func (mr *FollowerRepository) GetRecommendations(userId string) (model.Users, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+
+	userResults, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				`match (u:User)-[:IS_FOLLOWING]->(f:User)-[:IS_FOLLOWING]->(r:User)
+				where u.Id = $userId and not (u)-[:IS_FOLLOWING]->(r) AND r.Username <> u.Username
+				return distinct r.Id AS id, r.Username AS username, r.Image AS pImage`,
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			var users model.Users
+			for result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				users = append(users, &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				})
+			}
+			return users, nil
+		})
+	if err != nil {
+		mr.logger.Println("Error querying search:", err)
+		return nil, err
+	}
+	return userResults.(model.Users), nil
+}
