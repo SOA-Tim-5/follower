@@ -113,10 +113,30 @@ func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) 
 		next.ServeHTTP(rw, h)
 	})
 }
-func (f *FollowerHandler) GetFollowingsForUser(rw http.ResponseWriter, h *http.Request) {
+func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
-	users, err := f.repo.GetFollowingsForUser(id)
+	users, err := f.repo.GetFollowings(id)
+	if err != nil {
+		f.logger.Print("Database exception: ", err)
+	}
+	if users == nil {
+		users = model.Users{}
+		jsonData, _ := json.Marshal(users)
+		rw.Write(jsonData)
+		return
+	}
+	err = users.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
+		f.logger.Fatal("Unable to convert to json :", err)
+		return
+	}
+}
+func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["userId"]
+	users, err := f.repo.GetFollowers(id)
 	if err != nil {
 		f.logger.Print("Database exception: ", err)
 	}

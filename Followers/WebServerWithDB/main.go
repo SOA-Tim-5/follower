@@ -45,7 +45,10 @@ func main() {
 	postFollowingRouter.Use(FollowerHandler.MiddlewareFollowingDeserialization)
 
 	getFollowingsRouter := router.Methods(http.MethodGet).Subrouter()
-	getFollowingsRouter.HandleFunc("/user-followings/{userId}", FollowerHandler.GetFollowingsForUser)
+	getFollowingsRouter.HandleFunc("/followings/{userId}", FollowerHandler.GetFollowings)
+
+	getFollowersRouter := router.Methods(http.MethodGet).Subrouter()
+	getFollowersRouter.HandleFunc("/followers/{userId}", FollowerHandler.GetFollowers)
 
 	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
 
@@ -57,7 +60,7 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 	}
 
-	logger.Println("Server listening on port 8089")
+	logger.Println("Server listening on port 8090")
 	//Distribute all the connections to goroutines
 	go func() {
 		err := server.ListenAndServe()
