@@ -4,7 +4,6 @@ import (
 	"context"
 	"database-example/model"
 	"log"
-	"os"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -19,9 +18,9 @@ type FollowerRepository struct {
 // NoSQL: Constructor which reads db configuration from environment and creates a keyspace
 func New(logger *log.Logger) (*FollowerRepository, error) {
 	// Local instance
-	uri := os.Getenv("NEO4J_DB")
-	user := os.Getenv("NEO4J_USERNAME")
-	pass := os.Getenv("NEO4J_PASS")
+	uri := "bolt://neo4j:7687"
+	user := "neo4j"
+	pass := "ivanaanja"
 	auth := neo4j.BasicAuth(user, pass, "")
 
 	driver, err := neo4j.NewDriverWithContext(uri, auth)
@@ -54,7 +53,6 @@ func (mr *FollowerRepository) CloseDriverConnection(ctx context.Context) {
 	mr.driver.Close(ctx)
 }
 
-
 func (mr *FollowerRepository) SaveUser(user *model.User) (bool, error) {
 	userInDatabase, err := mr.ReadUser(user.Id)
 	if (userInDatabase == model.User{}) {
@@ -72,12 +70,12 @@ func (mr *FollowerRepository) SaveUser(user *model.User) (bool, error) {
 
 func (mr *FollowerRepository) WriteUser(user *model.User) error {
 	ctx := context.Background()
-	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"}) 
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer session.Close(ctx)
 	newUser, err := session.ExecuteWrite(ctx,
 		func(transaction neo4j.ManagedTransaction) (any, error) {
 			result, err := transaction.Run(ctx,
-				"CREATE (u:User) SET u.Id = $id, u.Username = $username, u.Image = $image RETURN u.Username + ', from node ' + id(u)",
+				"create (u:User) SET u.Id = $id, u.Username = $username, u.Image = $image return u.Username + ', from node ' + id(u)",
 				map[string]any{"id": user.Id, "username": user.Username, "image": user.Image})
 			if err != nil {
 				return nil, err
@@ -104,7 +102,7 @@ func (mr *FollowerRepository) ReadUser(userId string) (model.User, error) {
 	user, err := session.ExecuteRead(ctx,
 		func(transaction neo4j.ManagedTransaction) (any, error) {
 			result, err := transaction.Run(ctx,
-				"MATCH (u {Id: $id}) RETURN u.Id, u.Username, u.Image",
+				"match (u {Id: $id}) return u.Id, u.Username, u.Image",
 				map[string]any{"id": userId})
 			if err != nil {
 				return nil, err
@@ -137,13 +135,139 @@ func (mr *FollowerRepository) ReadUser(userId string) (model.User, error) {
 	}
 	userFromDatabase := model.User{
 		Id:       id,
-		Username:     username,
-		Image: image,
+		Username: username,
+		Image:    image,
 	}
 
 	return userFromDatabase, nil
 }
+func (mr *FollowerRepository) SaveFollowing(user *model.User, userToFollow *model.User) error {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+	mr.SaveUser(user)
+	mr.SaveUser(userToFollow)
+	_, err := session.ExecuteWrite(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				"match (a:User), (b:User) where a.Username = $username AND b.Username = $followUsername create (a)-[r: IS_FOLLOWING]->(b) return type(r)",
+				map[string]any{"username": user.Username, "followUsername": userToFollow.Username})
+			if err != nil {
+				return nil, err
+			}
+			if result.Next(ctx) {
+				return result.Record().Values[0], nil
+			}
+			return nil, result.Err()
+		})
+	if err != nil {
+		mr.logger.Println("Error inserting following:", err)
+		return err
+	}
+	return nil
+}
+func (mr *FollowerRepository) GetFollowings(userId string) (model.Users, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
 
+	userResults, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				`match (u:User)-[r:IS_FOLLOWING]->(p:User) where u.Id = $userId return p.Id as id, p.Username as username, p.Image as pImage`,
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
 
+			var users model.Users
+			for result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				users = append(users, &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				})
+			}
+			return users, nil
+		})
+	if err != nil {
+		mr.logger.Println("Error querying search:", err)
+		return nil, err
+	}
+	return userResults.(model.Users), nil
+}
 
+func (mr *FollowerRepository) GetFollowers(userId string) (model.Users, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
 
+	userResults, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				`match (u:User)-[r:IS_FOLLOWING]->(p:User) where p.Id = $userId return u.Id as id, u.Username as username, u.Image as pImage`,
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			var users model.Users
+			for result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				users = append(users, &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				})
+			}
+			return users, nil
+		})
+	if err != nil {
+		mr.logger.Println("Error querying search:", err)
+		return nil, err
+	}
+	return userResults.(model.Users), nil
+}
+func (mr *FollowerRepository) GetRecommendations(userId string) (model.Users, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+
+	userResults, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				`match (u:User)-[:IS_FOLLOWING]->(f:User)-[:IS_FOLLOWING]->(r:User)
+				where u.Id = $userId and not (u)-[:IS_FOLLOWING]->(r) AND r.Username <> u.Username
+				return distinct r.Id AS id, r.Username AS username, r.Image AS pImage`,
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			var users model.Users
+			for result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				users = append(users, &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				})
+			}
+			return users, nil
+		})
+	if err != nil {
+		mr.logger.Println("Error querying search:", err)
+		return nil, err
+	}
+	return userResults.(model.Users), nil
+}
