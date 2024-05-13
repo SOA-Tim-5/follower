@@ -1,0 +1,41 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "proto/follower";
+
+service Follower {
+    rpc CreateNewFollowing(UserFollowingDto) returns (FollowerResponseDto) {}
+    rpc GetFollowerRecommendations(id) returns (ListFollowingResponseDto) {} 
+    rpc GetFollowings(id) returns (ListFollowingResponseDto) {}
+    rpc GetFollowers(id) returns (ListFollowingResponseDto) {}
+}
+
+
+message UserFollowingDto {
+     string userId=1;
+     string username=2;
+     string image=3;
+     string followingUserId=4;
+     string followingUsername=5;
+     string followingImage=6;
+}
+
+message FollowingResponseDto {
+    string Id=1;
+    string Username=2;
+    string Image=3;
+}
+
+message FollowerResponseDto {
+    int64 Id=1;
+    int64 UserId=2;
+    int64 FollowedById=3;
+}
+
+message id {
+    string id=1;
+}
+
+message ListFollowingResponseDto {
+    repeated FollowingResponseDto ResponseList=1 ;
+}
