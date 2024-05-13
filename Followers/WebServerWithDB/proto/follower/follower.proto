@@ -33,7 +33,7 @@ message FollowerResponseDto {
 }
 
 message id {
-    string id=1;
+    string Id=1;
 }
 
 message ListFollowingResponseDto {
