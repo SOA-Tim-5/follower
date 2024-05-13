@@ -112,7 +112,7 @@ func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) 
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
-}
+}/*
 func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
@@ -132,7 +132,7 @@ func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request)
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}
+}*/
 func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
