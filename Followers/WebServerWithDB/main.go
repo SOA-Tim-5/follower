@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	handlers "database-example/handler"
+	"database-example/model"
+	"database-example/proto/follower"
 	repository "database-example/repo"
 	"log"
-	"net/http"
+	"net"
 	"os"
-	"os/signal"
 	"time"
 
-	gorillaHandlers "github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -27,6 +27,9 @@ func main() {
 	}
 	defer store.CloseDriverConnection(timeoutContext)
 	store.CheckConnection()
+	
+	
+/*
 	FollowerHandler := handlers.NewFollowersHandler(logger, store)
 
 	//Initialize the router and add a middleware for all the requests
@@ -83,5 +86,74 @@ func main() {
 	if server.Shutdown(timeoutContext) != nil {
 		logger.Fatal("Cannot gracefully shutdown...")
 	}
-	logger.Println("Server stopped")
+	logger.Println("Server stopped")*/
+
+	lis, err := net.Listen("tcp", "localhost:8090")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	var opts []grpc.ServerOption
+	grpcServer := grpc.NewServer(opts...)
+
+	follower.RegisterFollowerServer(grpcServer, Server{FollowerRepo: store})	//da li store?
+	reflection.Register(grpcServer)
+	grpcServer.Serve(lis)
+
+
+
+
 }
+
+type Server struct {
+	follower.UnimplementedFollowerServer
+	FollowerRepo         *repository.FollowerRepository
+}
+
+//sta je ova metoda, ne valjaju joj ni parametri
+func (s Server) CreateUser(ctx context.Context, request *follower.FollowingResponseDto) {
+	user := model.User{
+		Id: request.Id,	//provjeriti
+		Username: request.Username,
+		Image: request.Image,
+	}
+	userSaved, err := s.FollowerRepo.SaveUser(&user)
+	if err != nil {
+		println("Error while creating a new user")
+		return
+	}
+	if userSaved {
+		println("New user saved to database")
+		
+	} 
+}
+
+func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFollowingDto) (*follower.FollowerResponseDto, error) {
+	newFollowing := model.UserFollowing{
+		UserId: request.UserId,
+		Username: request.Username,
+		Image: request.Image,
+		FollowingUserId: request.FollowingUserId,
+		FollowingUsername: request.FollowingUsername,
+		FollowingImage: request.FollowingImage,
+	}
+	user := model.User{}
+	userToFollow := model.User{}
+	user.Id = newFollowing.UserId
+	user.Username = newFollowing.Username
+	user.Image = newFollowing.Image
+	userToFollow.Id = newFollowing.FollowingUserId
+	userToFollow.Username = newFollowing.FollowingUsername
+	userToFollow.Image = newFollowing.FollowingImage
+	err := s.FollowerRepo.SaveFollowing(&user, &userToFollow)
+	if err != nil {
+		println("Database exception: ", err)
+	}
+	return &follower.FollowerResponseDto{
+		Id: 1,	//sta ovo treba biti, u preth verziji se salje prazan User
+		UserId: 1,
+		FollowedById: 1,
+	}, nil
+}
+
+

@@ -12,12 +12,12 @@ service Follower {
 
 
 message UserFollowingDto {
-     string userId=1;
-     string username=2;
-     string image=3;
-     string followingUserId=4;
-     string followingUsername=5;
-     string followingImage=6;
+     string UserId=1;
+     string Username=2;
+     string Image=3;
+     string FollowingUserId=4;
+     string FollowingUsername=5;
+     string FollowingImage=6;
 }
 
 message FollowingResponseDto {
