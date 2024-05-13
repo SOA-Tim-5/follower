@@ -4,7 +4,6 @@ import (
 	"context"
 	"database-example/model"
 	repository "database-example/repo"
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -132,7 +131,7 @@ func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request)
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}*/
+}*//*
 func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
@@ -152,7 +151,7 @@ func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) 
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}/*
+}*//*
 func (f *FollowerHandler) GetRecommendations(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]

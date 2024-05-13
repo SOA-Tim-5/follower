@@ -204,3 +204,24 @@ func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follo
 	
 }
 
+func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	id := request.Id
+	users, err := s.FollowerRepo.GetFollowers(id)
+	if (err != nil ||  users==nil){
+		println("Database exception: ", err)
+		return &follower.ListFollowingResponseDto{
+			ResponseList: make([]*follower.FollowingResponseDto, 0),	//da se vrati prazna
+		}, nil
+	}
+	responseList := make([]*follower.FollowingResponseDto, len(users))
+    for i, user := range users {
+        responseList[i] = &follower.FollowingResponseDto{
+            Id:       user.Id,
+            Username: user.Username,
+            Image:    user.Image,
+        }
+    }
+	return &follower.ListFollowingResponseDto{
+		ResponseList: responseList,
+	}, nil
+}
