@@ -1,5 +1,4 @@
 syntax = "proto3";
-import "google/protobuf/timestamp.proto";
 
 option go_package = "proto/follower";
 
@@ -8,6 +7,8 @@ service Follower {
     rpc GetFollowerRecommendations(id) returns (ListFollowingResponseDto) {} 
     rpc GetFollowings(id) returns (ListFollowingResponseDto) {}
     rpc GetFollowers(id) returns (ListFollowingResponseDto) {}
+     
+    rpc GetAllFromFollowingUsers(id) returns (BlogListResponse) {}
 }
 
 
@@ -38,4 +39,23 @@ message id {
 
 message ListFollowingResponseDto {
     repeated FollowingResponseDto ResponseList=1 ;
+}
+
+message BlogResponseDto{
+     int32 Id =1;
+         string Title =2;
+         string Description =3;
+         string Date=4;
+         repeated string Pictures =5;
+         int32 Status =6;
+         int64 VoteCount =7;
+         int64 UpvoteCount =8;
+         int64 DownvoteCount=9;
+         int32 AuthorId =10;
+         int64 ClubId =11;
+}
+
+message BlogListResponse{
+    repeated BlogResponseDto Response =1;
+    repeated FollowingResponseDto  Following = 2;
 }
