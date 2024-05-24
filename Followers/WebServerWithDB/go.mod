@@ -7,6 +7,14 @@ require (
 	github.com/gorilla/mux v1.8.0
 	gorm.io/driver/mysql v1.3.2
 	gorm.io/gorm v1.25.7-0.20240204074919-46816ad31dde
+	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.32.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.32.0
+	go.opentelemetry.io/otel v1.7.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.7.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.7.0
+	go.opentelemetry.io/otel/sdk v1.7.0
+	go.opentelemetry.io/otel/trace v1.7.0
+	github.com/XSAM/otelsql v0.14.1
 )
 
 require github.com/felixge/httpsnoop v1.0.3 // indirect
