@@ -4,7 +4,6 @@ import (
 	"context"
 	"database-example/model"
 	repository "database-example/repo"
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -78,7 +77,7 @@ func (f *FollowerHandler) MiddlewarePersonDeserialization(next http.Handler) htt
 		next.ServeHTTP(rw, h)
 	})
 }
-
+/*
 func (f *FollowerHandler) CreateFollowing(rw http.ResponseWriter, h *http.Request) {
 	newFollowing := h.Context().Value(KeyProduct{}).(*model.UserFollowing)
 	user := model.User{}
@@ -98,7 +97,7 @@ func (f *FollowerHandler) CreateFollowing(rw http.ResponseWriter, h *http.Reques
 	user = model.User{}
 	jsonData, _ := json.Marshal(user)
 	rw.Write(jsonData)
-}
+}*/
 func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		newFollowing := &model.UserFollowing{}
@@ -112,7 +111,7 @@ func (f *FollowerHandler) MiddlewareFollowingDeserialization(next http.Handler) 
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
-}
+}/*
 func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
@@ -132,7 +131,7 @@ func (f *FollowerHandler) GetFollowings(rw http.ResponseWriter, h *http.Request)
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}
+}*//*
 func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
@@ -152,7 +151,7 @@ func (f *FollowerHandler) GetFollowers(rw http.ResponseWriter, h *http.Request) 
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}
+}*//*
 func (f *FollowerHandler) GetRecommendations(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id := vars["userId"]
@@ -172,4 +171,4 @@ func (f *FollowerHandler) GetRecommendations(rw http.ResponseWriter, h *http.Req
 		f.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
-}
+}*/

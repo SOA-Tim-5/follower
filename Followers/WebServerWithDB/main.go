@@ -2,18 +2,19 @@ package main
 
 import (
 	"context"
-	handlers "database-example/handler"
+	"database-example/model"
+	"database-example/proto/follower"
 	repository "database-example/repo"
 	"log"
-	"net/http"
+	"net"
 	"os"
-	"os/signal"
 	"time"
 
-	gorillaHandlers "github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -45,61 +46,221 @@ func main() {
 	}
 	defer store.CloseDriverConnection(timeoutContext)
 	store.CheckConnection()
-	FollowerHandler := handlers.NewFollowersHandler(logger, store)
 
-	//Initialize the router and add a middleware for all the requests
-	router := mux.NewRouter()
-	router.Use(FollowerHandler.MiddlewareContentTypeSet)
+	/*
+		FollowerHandler := handlers.NewFollowersHandler(logger, store)
 
-	postUserRouter := router.Methods(http.MethodPost).Subrouter()
-	postUserRouter.HandleFunc("/user", FollowerHandler.CreateUser)
-	postUserRouter.Use(FollowerHandler.MiddlewarePersonDeserialization)
+		//Initialize the router and add a middleware for all the requests
+		router := mux.NewRouter()
+		router.Use(FollowerHandler.MiddlewareContentTypeSet)
 
-	getUserRouter := router.Methods(http.MethodGet).Subrouter()
-	getUserRouter.HandleFunc("/user/{userId}", FollowerHandler.GetUser)
+		postUserRouter := router.Methods(http.MethodPost).Subrouter()
+		postUserRouter.HandleFunc("/user", FollowerHandler.CreateUser)
+		postUserRouter.Use(FollowerHandler.MiddlewarePersonDeserialization)
 
-	postFollowingRouter := router.Methods(http.MethodPost).Subrouter()
-	postFollowingRouter.HandleFunc("/follower/create", FollowerHandler.CreateFollowing)
-	postFollowingRouter.Use(FollowerHandler.MiddlewareFollowingDeserialization)
+		getUserRouter := router.Methods(http.MethodGet).Subrouter()
+		getUserRouter.HandleFunc("/user/{userId}", FollowerHandler.GetUser)
 
-	getFollowingsRouter := router.Methods(http.MethodGet).Subrouter()
-	getFollowingsRouter.HandleFunc("/followings/{userId}", FollowerHandler.GetFollowings)
+		postFollowingRouter := router.Methods(http.MethodPost).Subrouter()
+		postFollowingRouter.HandleFunc("/follower/create", FollowerHandler.CreateFollowing)
+		postFollowingRouter.Use(FollowerHandler.MiddlewareFollowingDeserialization)
 
-	getFollowersRouter := router.Methods(http.MethodGet).Subrouter()
-	getFollowersRouter.HandleFunc("/followers/{userId}", FollowerHandler.GetFollowers)
+		getFollowingsRouter := router.Methods(http.MethodGet).Subrouter()
+		getFollowingsRouter.HandleFunc("/followings/{userId}", FollowerHandler.GetFollowings)
 
-	getRecommendationsRouter := router.Methods(http.MethodGet).Subrouter()
-	getRecommendationsRouter.HandleFunc("/recommendations/{userId}", FollowerHandler.GetRecommendations)
+		getFollowersRouter := router.Methods(http.MethodGet).Subrouter()
+		getFollowersRouter.HandleFunc("/followers/{userId}", FollowerHandler.GetFollowers)
 
-	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
+		getRecommendationsRouter := router.Methods(http.MethodGet).Subrouter()
+		getRecommendationsRouter.HandleFunc("/recommendations/{userId}", FollowerHandler.GetRecommendations)
 
-	server := http.Server{
-		Addr:         ":8090",
-		Handler:      cors(router),
-		IdleTimeout:  120 * time.Second,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-	}
+		cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
 
-	logger.Println("Server listening on port 8090")
-	//Distribute all the connections to goroutines
-	go func() {
-		err := server.ListenAndServe()
-		if err != nil {
-			logger.Fatal(err)
+		server := http.Server{
+			Addr:         ":8090",
+			Handler:      cors(router),
+			IdleTimeout:  120 * time.Second,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 5 * time.Second,
 		}
-	}()
 
-	sigCh := make(chan os.Signal)
-	signal.Notify(sigCh, os.Interrupt)
-	signal.Notify(sigCh, os.Kill)
+		logger.Println("Server listening on port 8090")
+		//Distribute all the connections to goroutines
+		go func() {
+			err := server.ListenAndServe()
+			if err != nil {
+				logger.Fatal(err)
+			}
+		}()
 
-	sig := <-sigCh
-	logger.Println("Received terminate, graceful shutdown", sig)
+		sigCh := make(chan os.Signal)
+		signal.Notify(sigCh, os.Interrupt)
+		signal.Notify(sigCh, os.Kill)
 
-	//Try to shutdown gracefully
-	if server.Shutdown(timeoutContext) != nil {
-		logger.Fatal("Cannot gracefully shutdown...")
+		sig := <-sigCh
+		logger.Println("Received terminate, graceful shutdown", sig)
+
+		//Try to shutdown gracefully
+		if server.Shutdown(timeoutContext) != nil {
+			logger.Fatal("Cannot gracefully shutdown...")
+		}
+		logger.Println("Server stopped")*/
+
+	lis, err := net.Listen("tcp", "localhost:8090")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
 	}
+
 	logger.Println("Server stopped")
+
+
+	var opts []grpc.ServerOption
+	grpcServer := grpc.NewServer(opts...)
+
+	follower.RegisterFollowerServer(grpcServer, Server{FollowerRepo: store}) //da li store?
+	reflection.Register(grpcServer)
+	grpcServer.Serve(lis)
+
+}
+
+type Server struct {
+	follower.UnimplementedFollowerServer
+	FollowerRepo *repository.FollowerRepository
+}
+
+// sta je ova metoda, ne valjaju joj ni parametri
+func (s Server) CreateUser(ctx context.Context, request *follower.FollowingResponseDto) {
+	user := model.User{
+		Id:       request.Id, //provjeriti
+		Username: request.Username,
+		Image:    request.Image,
+	}
+	userSaved, err := s.FollowerRepo.SaveUser(&user)
+	if err != nil {
+		println("Error while creating a new user")
+		return
+	}
+	if userSaved {
+		println("New user saved to database")
+
+	}
+}
+
+func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFollowingDto) (*follower.FollowerResponseDto, error) {
+	newFollowing := model.UserFollowing{
+		UserId:            request.UserId,
+		Username:          request.Username,
+		Image:             request.Image,
+		FollowingUserId:   request.FollowingUserId,
+		FollowingUsername: request.FollowingUsername,
+		FollowingImage:    request.FollowingImage,
+	}
+	user := model.User{}
+	userToFollow := model.User{}
+	user.Id = newFollowing.UserId
+	user.Username = newFollowing.Username
+	user.Image = newFollowing.Image
+	userToFollow.Id = newFollowing.FollowingUserId
+	userToFollow.Username = newFollowing.FollowingUsername
+	userToFollow.Image = newFollowing.FollowingImage
+	println("djnjsdnskndksnd" + userToFollow.Username)
+	err := s.FollowerRepo.SaveFollowing(&user, &userToFollow)
+	if err != nil {
+		println("Database exception: ", err)
+	}
+	return &follower.FollowerResponseDto{
+		Id:           1, //sta ovo treba biti, u preth verziji se salje prazan User
+		UserId:       1,
+		FollowedById: 1,
+	}, nil
+}
+
+func (s Server) GetFollowerRecommendations(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	id := request.Id
+	users, err := s.FollowerRepo.GetRecommendations(id)
+	if err != nil || users == nil {
+		println("Database exception: ", err)
+		return &follower.ListFollowingResponseDto{
+			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
+		}, nil
+	}
+
+	responseList := make([]*follower.FollowingResponseDto, len(users))
+	for i, user := range users {
+		responseList[i] = &follower.FollowingResponseDto{
+			Id:       user.Id,
+			Username: user.Username,
+			Image:    user.Image,
+		}
+	}
+	return &follower.ListFollowingResponseDto{
+		ResponseList: responseList,
+	}, nil
+}
+
+func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	id := request.Id
+	users, err := s.FollowerRepo.GetFollowings(id)
+	if err != nil || users == nil {
+		println("Database exception: ", err)
+		return &follower.ListFollowingResponseDto{
+			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
+		}, nil
+	}
+	responseList := make([]*follower.FollowingResponseDto, len(users))
+	for i, user := range users {
+		responseList[i] = &follower.FollowingResponseDto{
+			Id:       user.Id,
+			Username: user.Username,
+			Image:    user.Image,
+		}
+	}
+	return &follower.ListFollowingResponseDto{
+		ResponseList: responseList,
+	}, nil
+
+}
+
+func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	id := request.Id
+	users, err := s.FollowerRepo.GetFollowers(id)
+	if err != nil || users == nil {
+		println("Database exception: ", err)
+		return &follower.ListFollowingResponseDto{
+			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
+		}, nil
+	}
+	responseList := make([]*follower.FollowingResponseDto, len(users))
+	for i, user := range users {
+		responseList[i] = &follower.FollowingResponseDto{
+			Id:       user.Id,
+			Username: user.Username,
+			Image:    user.Image,
+		}
+	}
+	return &follower.ListFollowingResponseDto{
+		ResponseList: responseList,
+	}, nil
+}
+
+func (s Server) GetAllFromFollowingUsers(ctx context.Context, request *follower.Id) (*follower.BlogListResponse, error) {
+	id := request.Id
+	users, err := s.FollowerRepo.GetFollowings(id)
+	if err != nil || users == nil {
+		println("Database exception: ", err)
+		return &follower.BlogListResponse{
+			Following: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
+		}, nil
+	}
+	responseList := make([]*follower.FollowingResponseDto, len(users))
+	for i, user := range users {
+		responseList[i] = &follower.FollowingResponseDto{
+			Id:       user.Id,
+			Username: user.Username,
+			Image:    user.Image,
+		}
+	}
+	return &follower.BlogListResponse{
+		Following: responseList,
+	}, nil
 }
