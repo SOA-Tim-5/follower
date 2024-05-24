@@ -147,6 +147,10 @@ func (s Server) CreateUser(ctx context.Context, request *follower.FollowingRespo
 }
 
 func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFollowingDto) (*follower.FollowerResponseDto, error) {
+	_, span := tp.Tracer("followers").Start(ctx, "create-new-following")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
+	defer func() { span.End() }()
+
+	span.AddEvent("Creating new following")
 	newFollowing := model.UserFollowing{
 		UserId:            request.UserId,
 		Username:          request.Username,
@@ -166,6 +170,7 @@ func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFo
 	println("djnjsdnskndksnd" + userToFollow.Username)
 	err := s.FollowerRepo.SaveFollowing(&user, &userToFollow)
 	if err != nil {
+		span.RecordError(err)
 		println("Database exception: ", err)
 	}
 	return &follower.FollowerResponseDto{
@@ -176,9 +181,14 @@ func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFo
 }
 
 func (s Server) GetFollowerRecommendations(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	_, span := tp.Tracer("followers").Start(ctx, "get-follower-recommendations")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
+	defer func() { span.End() }()
+
+	span.AddEvent("Get follower recommendations")
 	id := request.Id
 	users, err := s.FollowerRepo.GetRecommendations(id)
 	if err != nil || users == nil {
+		span.RecordError(err)
 		println("Database exception: ", err)
 		return &follower.ListFollowingResponseDto{
 			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
@@ -199,9 +209,14 @@ func (s Server) GetFollowerRecommendations(ctx context.Context, request *followe
 }
 
 func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	_, span := tp.Tracer("followers").Start(ctx, "get-followings")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
+	defer func() { span.End() }()
+
+	span.AddEvent("Get followings")
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowings(id)
 	if err != nil || users == nil {
+		span.RecordError(err)
 		println("Database exception: ", err)
 		return &follower.ListFollowingResponseDto{
 			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
@@ -222,9 +237,14 @@ func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follo
 }
 
 func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
+	_, span := tp.Tracer("followers").Start(ctx, "get-followers")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
+	defer func() { span.End() }()
+
+	span.AddEvent("Get followers")
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowers(id)
 	if err != nil || users == nil {
+		span.RecordError(err)
 		println("Database exception: ", err)
 		return &follower.ListFollowingResponseDto{
 			ResponseList: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
@@ -244,9 +264,14 @@ func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follow
 }
 
 func (s Server) GetAllFromFollowingUsers(ctx context.Context, request *follower.Id) (*follower.BlogListResponse, error) {
+	_, span := tp.Tracer("followers").Start(ctx, "get-all-from-following")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
+	defer func() { span.End() }()
+
+	span.AddEvent("Get all from following")
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowings(id)
 	if err != nil || users == nil {
+		span.RecordError(err)
 		println("Database exception: ", err)
 		return &follower.BlogListResponse{
 			Following: make([]*follower.FollowingResponseDto, 0), //da se vrati prazna
