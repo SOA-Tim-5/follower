@@ -271,3 +271,92 @@ func (mr *FollowerRepository) GetRecommendations(userId string) (model.Users, er
 	}
 	return userResults.(model.Users), nil
 }
+
+func (mr *FollowerRepository) WriteTouristProgress(user *model.TouristProgress) error {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+	newUser, err := session.ExecuteWrite(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				"create (u:TouristProgress) SET u.UserId = $userId, u.Xp = $xp, u.Level = $level return u.userId + ', from node '",
+				map[string]any{"userId": user.UserId, "xp": user.Xp, "level": user.Level})
+			if err != nil {
+				return nil, err
+			}
+
+			if result.Next(ctx) {
+				return result.Record().Values[0], nil
+			}
+
+			return nil, result.Err()
+		})
+	if err != nil {
+		mr.logger.Println("Error inserting TouristProgress:", err)
+		return err
+	}
+	mr.logger.Println(newUser.(string))
+	return nil
+}
+
+func (mr *FollowerRepository) SaveTouristProgress(user *model.TouristProgress) (bool, error) {
+	userInDatabase, err := mr.ReadTouristProgress(user.Id)
+	if (userInDatabase == model.TouristProgress{}) {
+		err = mr.WriteTouristProgress(user)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (mr *FollowerRepository) ReadTouristProgress(userId string) (model.TouristProgress, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+	user, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (any, error) {
+			result, err := transaction.Run(ctx,
+				"match (u {UserId: $userId}) return u.UserId, u.Xp, u.Level",
+				map[string]any{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			if result.Next(ctx) {
+				return result.Record().Values, nil
+			}
+
+			return nil, result.Err()
+		})
+	if err != nil {
+		mr.logger.Println("Error reading user:", err)
+		return model.TouristProgress{}, err
+	}
+	if user == nil {
+		return model.TouristProgress{}, nil
+	}
+	var id, xp, level string
+	for _, value := range user.([]interface{}) {
+		if val, ok := value.(string); ok {
+			if id == "" {
+				id = val
+			} else if xp == "" {
+				xp = val
+			} else if level == "" {
+				level = val
+			}
+		}
+	}
+	userFromDatabase := model.TouristProgress{
+		UserId: id,
+		Xp:     xp,
+		Level:  level,
+	}
+
+	return userFromDatabase, nil
+}

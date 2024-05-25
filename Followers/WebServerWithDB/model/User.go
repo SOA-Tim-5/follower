@@ -5,13 +5,10 @@ import (
 	"io"
 )
 
-
-
-
 type User struct {
-	Id    string `json:"Id,omitempty"`
-	Username  string  `json:"Username,omitempty"`
-	Image string `json:"Image,omitempty"`
+	Id       string `json:"Id,omitempty"`
+	Username string `json:"Username,omitempty"`
+	Image    string `json:"Image,omitempty"`
 }
 
 type Users []*User
