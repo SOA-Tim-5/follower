@@ -16,12 +16,12 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
+
 func initTracer() (func(context.Context) error, error) {
-	jaegerExporter, err := otlptracehttp.New(context.Background(), otlptracehttp.WithEndpoint("localhost:4318"), otlptracehttp.WithInsecure())
+	jaegerExporter, err := otlptracehttp.New(context.Background(), otlptracehttp.WithEndpoint("localhost:16686"), otlptracehttp.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func initTracer() (func(context.Context) error, error) {
 }
 
 func main() {
-	
+
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -76,7 +76,6 @@ func main() {
 	}
 
 	//logger.Println("Server stopped")
-
 
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
@@ -199,7 +198,7 @@ func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follo
 
 func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
 	tr := otel.Tracer("follower")
-	ctx, span := tr.Start(ctx, "GetFollowings")
+	ctx, span := tr.Start(ctx, "GetFollowers")
 	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowers(id)
@@ -225,7 +224,7 @@ func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follow
 
 func (s Server) GetAllFromFollowingUsers(ctx context.Context, request *follower.Id) (*follower.BlogListResponse, error) {
 	tr := otel.Tracer("follower")
-	ctx, span := tr.Start(ctx, "GetFollowings")
+	ctx, span := tr.Start(ctx, "GetAllFromFollowingUsers")
 	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowings(id)

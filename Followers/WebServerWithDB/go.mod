@@ -29,6 +29,7 @@ require (
 require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/neo4j/neo4j-go-driver/v5 v5.19.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	google.golang.org/genproto v0.0.0-20221018160656-63c7b68cfc55 // indirect
