@@ -11,29 +11,42 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
+func initTracer() (func(context.Context) error, error) {
+	jaegerExporter, err := otlptracehttp.New(context.Background(), otlptracehttp.WithEndpoint("localhost:4318"), otlptracehttp.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(
+		context.Background(),
+		resource.WithAttributes(
+			attribute.String("service.name", "followers"),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(jaegerExporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(tp)
+	return tp.Shutdown, nil
+}
 
 func main() {
-	log.SetOutput(os.Stderr)
-
-	// OpenTelemetry
-	var err error
-	tp, err = initTracer()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
-		}
-	}()
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-
+	
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -47,71 +60,22 @@ func main() {
 	defer store.CloseDriverConnection(timeoutContext)
 	store.CheckConnection()
 
-	/*
-		FollowerHandler := handlers.NewFollowersHandler(logger, store)
-
-		//Initialize the router and add a middleware for all the requests
-		router := mux.NewRouter()
-		router.Use(FollowerHandler.MiddlewareContentTypeSet)
-
-		postUserRouter := router.Methods(http.MethodPost).Subrouter()
-		postUserRouter.HandleFunc("/user", FollowerHandler.CreateUser)
-		postUserRouter.Use(FollowerHandler.MiddlewarePersonDeserialization)
-
-		getUserRouter := router.Methods(http.MethodGet).Subrouter()
-		getUserRouter.HandleFunc("/user/{userId}", FollowerHandler.GetUser)
-
-		postFollowingRouter := router.Methods(http.MethodPost).Subrouter()
-		postFollowingRouter.HandleFunc("/follower/create", FollowerHandler.CreateFollowing)
-		postFollowingRouter.Use(FollowerHandler.MiddlewareFollowingDeserialization)
-
-		getFollowingsRouter := router.Methods(http.MethodGet).Subrouter()
-		getFollowingsRouter.HandleFunc("/followings/{userId}", FollowerHandler.GetFollowings)
-
-		getFollowersRouter := router.Methods(http.MethodGet).Subrouter()
-		getFollowersRouter.HandleFunc("/followers/{userId}", FollowerHandler.GetFollowers)
-
-		getRecommendationsRouter := router.Methods(http.MethodGet).Subrouter()
-		getRecommendationsRouter.HandleFunc("/recommendations/{userId}", FollowerHandler.GetRecommendations)
-
-		cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
-
-		server := http.Server{
-			Addr:         ":8090",
-			Handler:      cors(router),
-			IdleTimeout:  120 * time.Second,
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 5 * time.Second,
+	shutdown, err := initTracer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
 		}
-
-		logger.Println("Server listening on port 8090")
-		//Distribute all the connections to goroutines
-		go func() {
-			err := server.ListenAndServe()
-			if err != nil {
-				logger.Fatal(err)
-			}
-		}()
-
-		sigCh := make(chan os.Signal)
-		signal.Notify(sigCh, os.Interrupt)
-		signal.Notify(sigCh, os.Kill)
-
-		sig := <-sigCh
-		logger.Println("Received terminate, graceful shutdown", sig)
-
-		//Try to shutdown gracefully
-		if server.Shutdown(timeoutContext) != nil {
-			logger.Fatal("Cannot gracefully shutdown...")
-		}
-		logger.Println("Server stopped")*/
+	}()
 
 	lis, err := net.Listen("tcp", "localhost:8090")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	logger.Println("Server stopped")
+	//logger.Println("Server stopped")
 
 
 	var opts []grpc.ServerOption
@@ -147,10 +111,9 @@ func (s Server) CreateUser(ctx context.Context, request *follower.FollowingRespo
 }
 
 func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFollowingDto) (*follower.FollowerResponseDto, error) {
-	_, span := tp.Tracer("followers").Start(ctx, "create-new-following")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
-	defer func() { span.End() }()
-
-	span.AddEvent("Creating new following")
+	tr := otel.Tracer("follower")
+	ctx, span := tr.Start(ctx, "CreateNewFollowing")
+	defer span.End()
 	newFollowing := model.UserFollowing{
 		UserId:            request.UserId,
 		Username:          request.Username,
@@ -181,10 +144,9 @@ func (s Server) CreateNewFollowing(ctx context.Context, request *follower.UserFo
 }
 
 func (s Server) GetFollowerRecommendations(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
-	_, span := tp.Tracer("followers").Start(ctx, "get-follower-recommendations")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
-	defer func() { span.End() }()
-
-	span.AddEvent("Get follower recommendations")
+	tr := otel.Tracer("follower")
+	ctx, span := tr.Start(ctx, "GetFollowerRecommendations")
+	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetRecommendations(id)
 	if err != nil || users == nil {
@@ -209,10 +171,9 @@ func (s Server) GetFollowerRecommendations(ctx context.Context, request *followe
 }
 
 func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
-	_, span := tp.Tracer("followers").Start(ctx, "get-followings")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
-	defer func() { span.End() }()
-
-	span.AddEvent("Get followings")
+	tr := otel.Tracer("follower")
+	ctx, span := tr.Start(ctx, "GetFollowings")
+	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowings(id)
 	if err != nil || users == nil {
@@ -237,10 +198,9 @@ func (s Server) GetFollowings(ctx context.Context, request *follower.Id) (*follo
 }
 
 func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follower.ListFollowingResponseDto, error) {
-	_, span := tp.Tracer("followers").Start(ctx, "get-followers")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
-	defer func() { span.End() }()
-
-	span.AddEvent("Get followers")
+	tr := otel.Tracer("follower")
+	ctx, span := tr.Start(ctx, "GetFollowings")
+	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowers(id)
 	if err != nil || users == nil {
@@ -264,10 +224,9 @@ func (s Server) GetFollowers(ctx context.Context, request *follower.Id) (*follow
 }
 
 func (s Server) GetAllFromFollowingUsers(ctx context.Context, request *follower.Id) (*follower.BlogListResponse, error) {
-	_, span := tp.Tracer("followers").Start(ctx, "get-all-from-following")	//provjeriti ne vracam tracecontext niti ga koristim za ispis greske nego drugacije dole
-	defer func() { span.End() }()
-
-	span.AddEvent("Get all from following")
+	tr := otel.Tracer("follower")
+	ctx, span := tr.Start(ctx, "GetFollowings")
+	defer span.End()
 	id := request.Id
 	users, err := s.FollowerRepo.GetFollowings(id)
 	if err != nil || users == nil {

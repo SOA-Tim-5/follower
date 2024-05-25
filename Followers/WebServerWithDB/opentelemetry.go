@@ -13,14 +13,7 @@ import (
 
 var tp *trace.TracerProvider
 
-func initTracer() (*trace.TracerProvider, error) {
-	url := os.Getenv("JAEGER_ENDPOINT")
-	if len(url) > 0 {
-		return initJaegerTracer(url)
-	} else {
-		return initFileTracer()
-	}
-}
+
 
 func initFileTracer() (*trace.TracerProvider, error) {
 	log.Println("Initializing tracing to traces.json")
