@@ -24,7 +24,12 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
+      - "14268:14268"
       - "16686:16686"
+      - "4138:4138"
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: 9411
+      COLLECTOR_OTLP_ENABLED: true
     networks:
       - monitoring
 

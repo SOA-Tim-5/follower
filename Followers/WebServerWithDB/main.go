@@ -12,7 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
@@ -21,7 +21,7 @@ import (
 )
 
 func initTracer() (func(context.Context) error, error) {
-	jaegerExporter, err := otlptracehttp.New(context.Background(), otlptracehttp.WithEndpoint("localhost:16686"), otlptracehttp.WithInsecure())
+	jaegerExporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://localhost:14268/api/traces")))
 	if err != nil {
 		return nil, err
 	}
