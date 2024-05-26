@@ -244,7 +244,7 @@ func (mr *FollowerRepository) GetRecommendations(userId string) (model.Users, er
 		func(transaction neo4j.ManagedTransaction) (any, error) {
 			result, err := transaction.Run(ctx,
 				`match (u:User)-[:IS_FOLLOWING]->(f:User)-[:IS_FOLLOWING]->(r:User)
-				where u.Id = $userId and not (u)-[:IS_FOLLOWING]->(r) AND r.Username <> u.Username
+				where u.Id = $userId and not (u)-[:IS_FOLLOWING]->(r) AND r.Username <> u.Username AND abs(u.Level - r.Level) <= 2
 				return distinct r.Id AS id, r.Username AS username, r.Image AS pImage`,
 				map[string]any{"userId": userId})
 			if err != nil {

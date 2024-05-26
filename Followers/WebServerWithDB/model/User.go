@@ -9,6 +9,7 @@ type User struct {
 	Id       string `json:"Id,omitempty"`
 	Username string `json:"Username,omitempty"`
 	Image    string `json:"Image,omitempty"`
+	Level    string `json:"Level,omitempty"`
 }
 
 type Users []*User
