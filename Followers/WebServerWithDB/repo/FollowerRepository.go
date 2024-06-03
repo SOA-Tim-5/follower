@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database-example/model"
+	"errors"
 	"log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -359,4 +360,59 @@ func (mr *FollowerRepository) ReadTouristProgress(userId string) (model.TouristP
 	}
 
 	return userFromDatabase, nil
+}
+
+func (mr *FollowerRepository) GetUserById(userId string) (*model.User, error) {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+
+	userResult, err := session.ExecuteRead(ctx,
+		func(transaction neo4j.ManagedTransaction) (interface{}, error) {
+			result, err := transaction.Run(ctx,
+				`MATCH (u:User {Id: $userId}) RETURN u.Id as id, u.Username as username, u.Image as pImage`,
+				map[string]interface{}{"userId": userId})
+			if err != nil {
+				return nil, err
+			}
+
+			if result.Next(ctx) {
+				record := result.Record()
+				id, _ := record.Get("id")
+				username, _ := record.Get("username")
+				pImage, _ := record.Get("pImage")
+				return &model.User{
+					Id:       id.(string),
+					Username: username.(string),
+					Image:    pImage.(string),
+				}, nil
+			}
+			return nil, nil // No user found
+		})
+	if err != nil {
+		mr.logger.Println("Error querying user by ID:", err)
+		return nil, err
+	}
+	if userResult == nil {
+		return nil, errors.New("user not found")
+	}
+	return userResult.(*model.User), nil
+}
+
+func (mr *FollowerRepository) UpdateUserLevelById(userId string, level string) error {
+	ctx := context.Background()
+	session := mr.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer session.Close(ctx)
+
+	_, err := session.Run(ctx,
+		`MATCH (u:User {Id: $userId}) SET u.Level = $level`,
+		map[string]interface{}{
+			"userId": userId,
+			"level":  level,
+		})
+	if err != nil {
+		mr.logger.Println("Error updating user level by ID:", err)
+		return err
+	}
+	return nil
 }

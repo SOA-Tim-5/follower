@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database-example/config"
+	handlers "database-example/handler"
 	"database-example/model"
 	"database-example/proto/follower"
 	repository "database-example/repo"
@@ -10,11 +12,16 @@ import (
 	"os"
 	"time"
 
+	saga "github.com/SOA-Tim-5/common/common/saga/messaging"
+	"github.com/SOA-Tim-5/common/common/saga/messaging/nats"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	//saga "github.com/SOA-Tim-5/common/common/saga/messaging"
+	//"github.com/SOA-Tim-5/common/common/saga/messaging/nats"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -77,10 +84,18 @@ func main() {
 
 	//logger.Println("Server stopped")
 
+	config := config.GetConfig()
+	server := Server{FollowerRepo: store, config: &config}
+
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 
-	follower.RegisterFollowerServer(grpcServer, Server{FollowerRepo: store}) //da li store?
+	commandSubscriber := initSubscriber(&server, config.CreateOrderReplySubject, QueueGroup)
+	replyPublisher := initPublisher(&server, server.config.CreateOrderCommandSubject)
+	initHandler(&server, store, replyPublisher, commandSubscriber)
+
+	follower.RegisterFollowerServer(grpcServer, server)
+
 	reflection.Register(grpcServer)
 	grpcServer.Serve(lis)
 
@@ -89,6 +104,39 @@ func main() {
 type Server struct {
 	follower.UnimplementedFollowerServer
 	FollowerRepo *repository.FollowerRepository
+	config       *config.Config
+}
+
+const (
+	QueueGroup = "encounter_service"
+)
+
+func initHandler(server *Server, service *repository.FollowerRepository, publisher saga.Publisher, subscriber saga.Subscriber) {
+	_, err := handlers.NewCompleteEncounterCommandHandler(service, publisher, subscriber)
+	println("init handler")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func initPublisher(server *Server, subject string) saga.Publisher {
+	publisher, err := nats.NewNATSPublisher(
+		server.config.NatsHost, server.config.NatsPort,
+		server.config.NatsUser, server.config.NatsPass, subject)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return publisher
+}
+
+func initSubscriber(server *Server, subject, queueGroup string) saga.Subscriber {
+	subscriber, err := nats.NewNATSSubscriber(
+		server.config.NatsHost, server.config.NatsPort,
+		server.config.NatsUser, server.config.NatsPass, subject, queueGroup)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return subscriber
 }
 
 // sta je ova metoda, ne valjaju joj ni parametri
