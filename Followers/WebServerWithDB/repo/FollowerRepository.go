@@ -57,6 +57,7 @@ func (mr *FollowerRepository) CloseDriverConnection(ctx context.Context) {
 func (mr *FollowerRepository) SaveUser(user *model.User) (bool, error) {
 	userInDatabase, err := mr.ReadUser(user.Id)
 	if (userInDatabase == model.User{}) {
+		user.Level = "0"
 		err = mr.WriteUser(user)
 		if err != nil {
 			return false, err
